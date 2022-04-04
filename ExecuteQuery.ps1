@@ -25,7 +25,7 @@ function ExecuteQuery($Query, $ConnectionString) {
 }
 
 $config = ConvertFrom-Json $configuration
-$connectionString = "Data Source=$($config.server);Initial Catalog=$($config.database);User Id=$($config.userId);Password=$($config.password);";
+$connectionString = "Data Source=$($config.server);Initial Catalog=$($config.database);User Id=$($config.user);Password=$($config.password);";
 
 $query = "";
 

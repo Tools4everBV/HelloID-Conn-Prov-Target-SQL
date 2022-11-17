@@ -8,14 +8,58 @@
   <img src="https://user-images.githubusercontent.com/69046642/202390978-fe7069e3-62f2-456f-9b98-c3c74d709489.png">
 </p>
 
-A generic HelloID provisioning target connector for executing Microsoft SQL queries.
+## Versioning
+| Version | Description | Date |
+| - | - | - |
+| 1.0.0   | Updated create,update,delete examples | 2022/11/17  |
+| 0.9.0   | Initial release | 2022/04/01  |
 
-## Instructions
-- Use the ExecuteQuery.ps1 script whenever you need to perform a SELECT action in SQL, the table will be returned from the function call.
-- Use the ExecuteNonQuery.ps1 script anywhere you need to perform non-SELECT (UPDATE, INSERT, etc) actions against a SQL database.
+<!-- TABLE OF CONTENTS -->
+## Table of Contents
+- [HelloID-Conn-Prov-Target-SQL](#helloid-conn-prov-target-sql)
+  - [Versioning](#versioning)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [Getting started](#getting-started)
+    - [Connection settings](#connection-settings)
+    - [Remarks](#remarks)
+  - [Getting help](#getting-help)
+  - [HelloID docs](#helloid-docs)
 
-**Remember to fill in the $query variable with your nessecary SQL script**
 
+## Introduction
+_HelloID-Conn-Prov-Target-SQL is a _target_ connector. This is ageneric HelloID provisioning target connector for executing Microsoft SQL queries. The HelloID connector allows you to writing,updating and deleting rows in Microsoft SQL database table.
 
-# HelloID Docs
+> Note that this connector is generic and therfore only has limited examples.
+ - > We only have examples for create,update and delete, since enable/disable are just an update action with a different account object.
+
+The HelloID connector consists of the template scripts shown in the following table.
+
+| Action                          | Action(s) Performed                           | Comment   | 
+| ------------------------------- | --------------------------------------------- | --------- |
+| create.ps1                      | Correlate or create SQL record                |           |
+| update.ps1                      | Update SQL record                             |           |
+| delete.ps1                      | Delete SQL record                             | Be careful when implementing this! There is no way to restore deleted records (apart from a backup and restore).  |
+
+<!-- GETTING STARTED -->
+## Getting started
+### Connection settings
+The following settings are required to connect to the API.
+
+| Setting               | Description                                                       | Mandatory   |
+| --------------------- | ----------------------------------------------------------------- | ----------- |
+| Connection string       | The connection string used to connect to the SQL database. Must include Initial Catalog                               | Yes         |
+| Table             | The table in which the records reside                   | Yes         |
+| Update when correlating and mapped data differs from data in SQL DB         | When toggled, the mapped properties will be updated in the create action (not just correlate).               | No         |
+| Toggle debug logging | When toggled, extra logging is shown. Note that this is only meant for debugging, please switch this off when in production. | No         |
+
+### Remarks
+> We can only set existing rows of an existing database table. We cannot create new rows during the actions.
+
+## Getting help
+> _For more information on how to configure a HelloID PowerShell connector, please refer to our [documentation](https://docs.helloid.com/hc/en-us/articles/360012558020-Configure-a-custom-PowerShell-target-system) pages_
+
+> _If you need help, feel free to ask questions on our [forum](https://forum.helloid.com)_
+
+## HelloID docs
 The official HelloID documentation can be found at: https://docs.helloid.com/

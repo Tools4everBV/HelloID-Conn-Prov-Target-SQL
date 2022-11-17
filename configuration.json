@@ -1,46 +1,44 @@
 [
-    {
-      "key": "server",
-      "type": "input",
-      "defaultValue": "",
-      "templateOptions": {
-        "label": "SQL Server",
-        "placeholder": "tcp:[namehere].database.windows.net,1433",
-        "description": "Please add a SQL server to connect with",
-        "required": true
-      }
-    },
-    {
-      "key": "database",
-      "type": "input",
-      "defaultValue": "",
-      "templateOptions": {
-        "label": "SQL Database",
-        "placeholder": "Please enter Database name",
-        "description": "Please add a SQL database to connect with",
-        "required": true
-      }
-    },
-    {
-      "key": "user",
-      "type": "input",
-      "defaultValue": "",
-      "templateOptions": {
-        "label": "SQL User",
-        "placeholder": "Please enter SQL User",
-        "description": "Please add a SQL user to connect with",
-        "required": true
-      }
-    },
-    {
-      "key": "password",
-      "type": "input",
-      "defaultValue": "",
-      "templateOptions": {
-        "label": "Please add a SQL user password to connect with",
-        "type": "password",
-        "placeholder": "Please enter a password",
-        "required": true
-      }
+  {
+    "key": "connectionString",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "Connection string",
+      "placeholder": "Data Source=server\\instance;Trusted_Connection=True;Initial Catalog=database;",
+      "description": "The connection string used to connect to the SQL database. Must include Initial Catalog",
+      "required": true
     }
-  ]
+  },
+  {
+    "key": "table",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "Table",
+      "placeholder": "Accounts",
+      "description": "The table in which the records reside",
+      "required": true
+    }
+  },
+  {
+    "key": "updateOnCorrelate",
+    "type": "checkbox",
+    "defaultValue": false,
+    "templateOptions": {
+      "label": "Update when correlating and mapped data differs from data in SQL DB",
+      "required": false,
+      "description": "This will update the record in SQL DB in the create action (not just correlate)."
+    }
+  },
+  {
+    "key": "isDebug",
+    "type": "checkbox",
+    "defaultValue": false,
+    "templateOptions": {
+      "label": "Toggle debug logging",
+      "description": "When toggled, debug logging will be displayed",
+      "required": false
+    }
+  }
+]

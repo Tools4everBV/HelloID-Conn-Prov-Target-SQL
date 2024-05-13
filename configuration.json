@@ -22,16 +22,6 @@
     }
   },
   {
-    "key": "updateOnCorrelate",
-    "type": "checkbox",
-    "defaultValue": false,
-    "templateOptions": {
-      "label": "Update when correlating and mapped data differs from data in SQL DB",
-      "required": false,
-      "description": "This will update the record in SQL DB in the create action (not just correlate)."
-    }
-  },
-  {
     "key": "isDebug",
     "type": "checkbox",
     "defaultValue": false,

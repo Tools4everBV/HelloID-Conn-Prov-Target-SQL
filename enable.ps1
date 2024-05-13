@@ -1,7 +1,7 @@
-##################################################
-# HelloID-Conn-Prov-Target-SQL-Delete
+#################################################
+# HelloID-Conn-Prov-Target-SQL-Enable
 # PowerShell V2
-##################################################
+#################################################
 $outputContext.success = $true
 
 # Enable TLS1.2
@@ -128,10 +128,10 @@ try {
         throw 'The account reference could not be found'
     }
 
-    Write-Information "Verifying if a SQL account for [$($personContext.Person.DisplayName)] exists"
     $correlationField = $actionContext.CorrelationConfiguration.accountField
     $correlationValue = $actionContext.CorrelationConfiguration.accountFieldValue
-    
+
+    Write-Information "Verifying if a SQL account for [$($personContext.Person.DisplayName)] exists"    
     $sqlQueryGetCurrentAccount = "
         SELECT 
             * 
@@ -149,11 +149,12 @@ try {
 
     Invoke-SQLQuery @sqlQueryGetCurrentAccountSplatParams -Data ([ref]$sqlQueryGetCurrentAccountResult)
     $correlatedAccount = $sqlQueryGetCurrentAccountResult
-    
+        
+    $outputContext.PreviousData.Active = [string][int]$correlatedAccount.Active
 
     if ($null -ne $correlatedAccount) {
-        $action = 'DeleteAccount'
-        $dryRunMessage = "Delete SQL account: [$($actionContext.References.Account)] for person: [$($personContext.Person.DisplayName)] will be executed during enforcement"
+        $action = 'EnableAccount'
+        $dryRunMessage = "Enable SQL account: [$($actionContext.References.Account)] for person: [$($personContext.Person.DisplayName)] will be executed during enforcement"
     }
     else {
         $action = 'NotFound'
@@ -168,73 +169,78 @@ try {
     # Process
     if (-not($actionContext.DryRun -eq $true)) {
         switch ($action) {
-            'DeleteAccount' {
+            'EnableAccount' {
                 try {
-                    Write-Information "Deleting SQL account with accountReference: [$($actionContext.References.Account)]"
-                    $sqlQueryDeleteCurrentAccount = "
-                DELETE
-                FROM
+                    Write-Information "Enabling SQL account with accountReference: [$($actionContext.References.Account)]"
+                
+                    $sqlQueryEnableAccount = "
+                UPDATE
                     $($actionContext.Configuration.table)
+                SET
+                    Active = $($actionContext.Data.Active)
                 WHERE
-                    $correlationField = '$correlationValue'"
-        
-                    $sqlQueryDeleteCurrentAccountResult = [System.Collections.ArrayList]::new()
-                    $sqlQueryDeleteCurrentAccountSplatParams = @{
+                    $correlationField = '$correlationValue'"                    
+
+                    $sqlQueryEnableAccountResult = [System.Collections.ArrayList]::new()
+                    $sqlQuerEnableAccountSplatParams = @{
                         ConnectionString = $actionContext.Configuration.connectionString
-                        SqlQuery         = $sqlQueryDeleteCurrentAccount
+                        SqlQuery         = $sqlQueryEnableAccount
                         ErrorAction      = 'Stop'
                     }
 
-                    Invoke-SQLQuery @sqlQueryDeleteCurrentAccountSplatParams -Data ([ref]$sqlQueryDeleteCurrentAccountResult)
-                    $deletedAccount = $sqlQueryDeleteCurrentAccountResult
-        
+                    Invoke-SQLQuery @sqlQuerEnableAccountSplatParams -Data ([ref]$sqlQueryEnableAccountResult)
+                    $null = $sqlQueryEnableAccountResult
+
+                    $outputContext.Data = $actionContext.Data
+                    $outputContext.AccountReference = $correlationValue
+
                     $outputContext.AuditLogs.Add([PSCustomObject]@{
                             Action  = $action
-                            Message = "Successfully deleted record in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'"
+                            Message = "Successfully enabled account in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'."
                             IsError = $false
                         })
                 }
                 catch {
+                    
                     $ex = $PSItem
                     $verboseErrorMessage = $ex.Exception.Message
                     $auditErrorMessage = $ex.Exception.Message
-    
+        
                     Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
-    
+        
                     $auditLogs.Add([PSCustomObject]@{
                             Action  = $action
-                            Message = "Error deleting account in SQL table '$($actionContext.Configuration.table)' where '$($correlationProperty)'='$($correlationValue)'. Sql Query: [$sqlQueryCreateNewAccount]. Error Message: $auditErrorMessage"
+                            Message = "Error enabling account in SQL table '$($actionContext.Configuration.table)' where '$($correlationProperty)'='$($correlationValue)'. Sql Query: [$sqlQueryCreateNewAccount]. Error Message: $auditErrorMessage"
                             IsError = $True
                         })
+                    
                 }
                 break
             }
-
             'NotFound' {                
                 $outputContext.AuditLogs.Add([PSCustomObject]@{
-                        Action  = 'DeleteAccount'
                         Message = "SQL account: [$($actionContext.References.Account)] for person: [$($personContext.Person.DisplayName)] could not be found, possibly indicating that it could be deleted, or the account is not correlated"
-                        IsError = $false
+                        IsError = $true
                     })
                 break
             }
         }
     }
 }
-catch {    
+catch {        
     $ex = $PSItem
     if ($($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or
         $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
-        $errorObj = Resolve-SQLError -ErrorObject $ex
-        $auditMessage = "Could not delete SQL account. Error: $($errorObj.FriendlyMessage)"
+        $errorObj = Resolve-SQLError Error -ErrorObject $ex
+        $auditMessage = "Could not enable SQL account. Error: $($errorObj.FriendlyMessage)"
         Write-Warning "Error at Line '$($errorObj.ScriptLineNumber)': $($errorObj.Line). Error: $($errorObj.ErrorDetails)"
     }
     else {
-        $auditMessage = "Could not delete SQL account. Error: $($_.Exception.Message)"
+        $auditMessage = "Could not enable SQL account. Error: $($ex.Exception.Message)"
         Write-Warning "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
     }
     $outputContext.AuditLogs.Add([PSCustomObject]@{
-            Action  = 'DeleteAccount'
+            Action  = "EnableAccount"
             Message = $auditMessage
             IsError = $true
         })

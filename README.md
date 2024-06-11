@@ -4,7 +4,7 @@
 > This repository contains the connector and configuration code only. The implementer is responsible to acquire the connection details such as username, password, certificate, etc. You might even need to sign a contract or agreement with the supplier before implementing this connector. Please contact the client's application manager to coordinate the connector requirements.
 
 <p align="center">
-  <img src="">
+   <img src="https://www.tools4ever.nl/connector-logos/microsoftsql-logo.png">
 </p>
 
 ## Table of contents
@@ -18,8 +18,7 @@
       - [Field mapping](#field-mapping)
     - [Connection settings](#connection-settings)
     - [Prerequisites](#prerequisites)
-    - [Remarks](#remarks)
-  - [Setup the connector](#setup-the-connector)
+    - [Remarks](#remarks)  
   - [Getting help](#getting-help)
   - [HelloID docs](#helloid-docs)
 
@@ -59,7 +58,8 @@ To properly setup the correlation:
    | Person correlation field  | `PersonContext.Person.ExternalId` |
    | Account correlation field | `EmployeeId`                      |
 
-> [!TIP] > _For more information on correlation, please refer to our correlation [documentation](https://docs.helloid.com/en/provisioning/target-systems/powershell-v2-target-systems/correlation.html) pages_.
+> [!TIP] 
+> _For more information on correlation, please refer to our correlation [documentation](https://docs.helloid.com/en/provisioning/target-systems/powershell-v2-target-systems/correlation.html) pages_.
 
 #### Field mapping
 
@@ -73,21 +73,18 @@ The following settings are required to connect to the SQL Server.
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------- |
 | ConnectionString     | The connection string used to connect to the SQL database. Must include Initial Catalog                                      | Yes       |
 | Table                | The table in which the records reside                                                                                        | Yes       |
-| Toggle debug logging | When toggled, extra logging is shown. Note that this is only meant for debugging, please switch this off when in production. | No        |
 
 ### Prerequisites
 
 ### Remarks
 
-## Setup the connector
-
-> _How to setup the connector in HelloID._ Are special settings required. Like the _primary manager_ settings for a source connector.
-
 ## Getting help
 
-> [!TIP] > _For more information on how to configure a HelloID PowerShell connector, please refer to our [documentation](https://docs.helloid.com/en/provisioning/target-systems/powershell-v2-target-systems.html) pages_.
+> [!TIP] 
+> _For more information on how to configure a HelloID PowerShell connector, please refer to our [documentation](https://docs.helloid.com/en/provisioning/target-systems/powershell-v2-target-systems.html) pages_.
 
-> [!TIP] > _If you need help, feel free to ask questions on our [forum](https://forum.helloid.com)_.
+> [!TIP] 
+> _If you need help, feel free to ask questions on our [forum](https://forum.helloid.com)_.
 
 ## HelloID docs
 

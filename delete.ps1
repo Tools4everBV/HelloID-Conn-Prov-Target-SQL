@@ -2,16 +2,9 @@
 # HelloID-Conn-Prov-Target-SQL-Delete
 # PowerShell V2
 ##################################################
-$outputContext.success = $true
 
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
-
-# Set debug logging
-switch ($actionContext.Configuration.isDebug) {
-    $true { $VerbosePreference = 'Continue' }
-    $false { $VerbosePreference = 'SilentlyContinue' }
-}
 
 #region functions
 function Invoke-SQLQuery {
@@ -40,9 +33,6 @@ function Invoke-SQLQuery {
             $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
             $credential = [System.Management.Automation.PSCredential]::new($Username, $securePassword)
  
-            # Set the password as read only
-            $credential.Password.MakeReadOnly()
- 
             # Create the SqlCredential object
             $sqlCredential = [System.Data.SqlClient.SqlCredential]::new($credential.username, $credential.password)
         }
@@ -53,7 +43,7 @@ function Invoke-SQLQuery {
             $SqlConnection.Credential = $sqlCredential
         }
         $SqlConnection.Open()
-        Write-Verbose "Successfully connected to SQL database" 
+        Write-Information "Successfully connected to SQL database" 
 
         # Set the query
         $SqlCmd = [System.Data.SqlClient.SqlCommand]::new()
@@ -79,45 +69,7 @@ function Invoke-SQLQuery {
         if ($SqlConnection.State -eq "Open") {
             $SqlConnection.close()
         }
-        Write-Verbose "Successfully disconnected from SQL database"
-    }
-}
-
-function Resolve-SQLError {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory)]
-        [object]
-        $ErrorObject
-    )
-    process {
-        $httpErrorObj = [PSCustomObject]@{
-            ScriptLineNumber = $ErrorObject.InvocationInfo.ScriptLineNumber
-            Line             = $ErrorObject.InvocationInfo.Line
-            ErrorDetails     = $ErrorObject.Exception.Message
-            FriendlyMessage  = $ErrorObject.Exception.Message
-        }
-        if (-not [string]::IsNullOrEmpty($ErrorObject.ErrorDetails.Message)) {
-            $httpErrorObj.ErrorDetails = $ErrorObject.ErrorDetails.Message
-        }
-        elseif ($ErrorObject.Exception.GetType().FullName -eq 'System.Net.WebException') {
-            if ($null -ne $ErrorObject.Exception.Response) {
-                $streamReaderResponse = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()
-                if (-not [string]::IsNullOrEmpty($streamReaderResponse)) {
-                    $httpErrorObj.ErrorDetails = $streamReaderResponse
-                }
-            }
-        }
-        try {
-            # $errorDetailsObject = ($httpErrorObj.ErrorDetails | ConvertFrom-Json)
-            # Make sure to inspect the error result object and add only the error message as a FriendlyMessage.
-            # $httpErrorObj.FriendlyMessage = $errorDetailsObject.message
-            $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails # Temporarily assignment
-        }
-        catch {
-            $httpErrorObj.FriendlyMessage = $httpErrorObj.ErrorDetails
-        }
-        Write-Output $httpErrorObj
+        Write-Information "Successfully disconnected from SQL database"
     }
 }
 #endregion
@@ -130,7 +82,7 @@ try {
 
     Write-Information "Verifying if a SQL account for [$($personContext.Person.DisplayName)] exists"
     $correlationField = $actionContext.CorrelationConfiguration.accountField
-    $correlationValue = $actionContext.CorrelationConfiguration.accountFieldValue
+    $correlationValue = $actionContext.References.Account
     
     $sqlQueryGetCurrentAccount = "
         SELECT 
@@ -165,48 +117,36 @@ try {
         Write-Information "[DryRun] $dryRunMessage"
     }
 
+
     # Process
     if (-not($actionContext.DryRun -eq $true)) {
         switch ($action) {
             'DeleteAccount' {
-                try {
-                    Write-Information "Deleting SQL account with accountReference: [$($actionContext.References.Account)]"
-                    $sqlQueryDeleteCurrentAccount = "
+                
+                Write-Information "Deleting SQL account with accountReference: [$($actionContext.References.Account)]"
+                $sqlQueryDeleteCurrentAccount = "
                 DELETE
                 FROM
                     $($actionContext.Configuration.table)
                 WHERE
                     $correlationField = '$correlationValue'"
         
-                    $sqlQueryDeleteCurrentAccountResult = [System.Collections.ArrayList]::new()
-                    $sqlQueryDeleteCurrentAccountSplatParams = @{
-                        ConnectionString = $actionContext.Configuration.connectionString
-                        SqlQuery         = $sqlQueryDeleteCurrentAccount
-                        ErrorAction      = 'Stop'
-                    }
+                $sqlQueryDeleteCurrentAccountResult = [System.Collections.ArrayList]::new()
+                $sqlQueryDeleteCurrentAccountSplatParams = @{
+                    ConnectionString = $actionContext.Configuration.connectionString
+                    SqlQuery         = $sqlQueryDeleteCurrentAccount
+                    ErrorAction      = 'Stop'
+                }
 
-                    Invoke-SQLQuery @sqlQueryDeleteCurrentAccountSplatParams -Data ([ref]$sqlQueryDeleteCurrentAccountResult)
-                    $deletedAccount = $sqlQueryDeleteCurrentAccountResult
+                Invoke-SQLQuery @sqlQueryDeleteCurrentAccountSplatParams -Data ([ref]$sqlQueryDeleteCurrentAccountResult)
+                $deletedAccount = $sqlQueryDeleteCurrentAccountResult
         
-                    $outputContext.AuditLogs.Add([PSCustomObject]@{
-                            Action  = $action
-                            Message = "Successfully deleted record in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'"
-                            IsError = $false
-                        })
-                }
-                catch {
-                    $ex = $PSItem
-                    $verboseErrorMessage = $ex.Exception.Message
-                    $auditErrorMessage = $ex.Exception.Message
-    
-                    Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
-    
-                    $auditLogs.Add([PSCustomObject]@{
-                            Action  = $action
-                            Message = "Error deleting account in SQL table '$($actionContext.Configuration.table)' where '$($correlationProperty)'='$($correlationValue)'. Sql Query: [$sqlQueryCreateNewAccount]. Error Message: $auditErrorMessage"
-                            IsError = $True
-                        })
-                }
+                $outputContext.AuditLogs.Add([PSCustomObject]@{
+                        Action  = $action
+                        Message = "Successfully deleted record in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'"
+                        IsError = $false
+                    })
+                
                 break
             }
 
@@ -219,29 +159,18 @@ try {
                 break
             }
         }
+        $outputContext.Success = $true
     }
 }
 catch {    
     $ex = $PSItem
-    if ($($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or
-        $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
-        $errorObj = Resolve-SQLError -ErrorObject $ex
-        $auditMessage = "Could not delete SQL account. Error: $($errorObj.FriendlyMessage)"
-        Write-Warning "Error at Line '$($errorObj.ScriptLineNumber)': $($errorObj.Line). Error: $($errorObj.ErrorDetails)"
-    }
-    else {
-        $auditMessage = "Could not delete SQL account. Error: $($_.Exception.Message)"
-        Write-Warning "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
-    }
+    
+    $auditMessage = "Could not delete SQL account. Error: $($_.Exception.Message)"
+    Write-Warning "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
+    
     $outputContext.AuditLogs.Add([PSCustomObject]@{
             Action  = 'DeleteAccount'
             Message = $auditMessage
             IsError = $true
         })
-}
-finally {
-    # Check if auditLogs contains errors, if errors are found, set success to false
-    if ($outputContext.AuditLogs.IsError -contains $true) {
-        $outputContext.Success = $false
-    }
 }

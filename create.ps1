@@ -1,63 +1,10 @@
-#####################################################
+#################################################
 # HelloID-Conn-Prov-Target-SQL-Create
-#
-# Version: 1.0.0
-#####################################################
+# PowerShell V2
+#################################################
 
-$c = $configuration | ConvertFrom-Json
-$p = $person | ConvertFrom-Json
-$m = $manager | ConvertFrom-Json
-$mRef = $managerAccountReference | ConvertFrom-Json
-$success = $false
-$auditLogs = [Collections.Generic.List[PSCustomObject]]::new()
-
-# Set TLS to accept TLS, TLS 1.1 and TLS 1.2
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
-
-# Set debug logging
-switch ($($c.isDebug)) {
-    $true { $VerbosePreference = 'Continue' }
-    $false { $VerbosePreference = 'SilentlyContinue' }
-}
-$InformationPreference = "Continue"
-$WarningPreference = "Continue"
-
-# Used to connect to SQL server.
-$connectionString = $c.connectionString
-$username = $c.username # Only use when you want to connect using SQL credentials
-$password = $c.password # Only use when you want to connect using SQL credentials
-$table = $c.table
-$updateOnCorrelate = $c.updateOnCorrelate
-
-#Change mapping here
-# Enclose all values in double quotes, since the SQL values are always a string
-$account = [PSCustomObject]@{
-    'EmployeeId'       = "$($p.ExternalId)"
-    'Nickname'         = "$($p.Name.NickName)"
-    'Birthname'        = "$($p.Name.FamilyName)"
-    'Business Email'   = "$($p.Contact.Business.Email)"
-    'Birthname prefix' = "$($p.Name.FamilyNamePrefix)"
-    'Department'       = "$($p.PrimaryContract.Department.DisplayName)"
-    'Jobtitle'         = "$($p.PrimaryContract.Title.Name)"
-    'Employer'         = "$($p.PrimaryContract.Employer.Name)"
-}
-
-# Troubleshooting
-# $dryRun = $false
-# $account = [PSCustomObject]@{
-#     'EmployeeId'       = 'Test1'
-#     'Nickname'         = 'Test'
-#     'Birthname'        = "HelloID1"
-#     'Business Email'   = "TestHelloID1@test.nl"
-#     'Birthname prefix' = "van der"
-#     'Department'       = "Testing"
-#     'Jobtitle'         = "Testaccount"
-#     'Employer'         = "HelloID"
-# }
-
-$correlationProperty = "EmployeeId"
-$correlationValue = $account.EmployeeId # Has to match the AFAS value of the specified filter field ($filterfieldid)
-
+# Enable TLS1.2
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 
 #region functions
 function Invoke-SQLQuery {
@@ -86,9 +33,6 @@ function Invoke-SQLQuery {
             $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
             $credential = [System.Management.Automation.PSCredential]::new($Username, $securePassword)
  
-            # Set the password as read only
-            $credential.Password.MakeReadOnly()
- 
             # Create the SqlCredential object
             $sqlCredential = [System.Data.SqlClient.SqlCredential]::new($credential.username, $credential.password)
         }
@@ -99,7 +43,7 @@ function Invoke-SQLQuery {
             $SqlConnection.Credential = $sqlCredential
         }
         $SqlConnection.Open()
-        Write-Verbose "Successfully connected to SQL database" 
+        Write-Information "Successfully connected to SQL database" 
 
         # Set the query
         $SqlCmd = [System.Data.SqlClient.SqlCommand]::new()
@@ -125,89 +69,79 @@ function Invoke-SQLQuery {
         if ($SqlConnection.State -eq "Open") {
             $SqlConnection.close()
         }
-        Write-Verbose "Successfully disconnected from SQL database"
+        Write-Information "Successfully disconnected from SQL database"
     }
 }
-#endregion functions
+#endregion
 
-# Get current SQL record and verify if a user must be either [created], [updated and correlated] or just [correlated]
 try {
-    Write-Verbose "Querying record from SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-    $sqlQueryGetCurrentAccount = "
-    SELECT
-        * 
-    FROM
-        $table
-    WHERE
-        $correlationProperty = '$correlationValue'"
+    # Initial Assignments
+    $outputContext.AccountReference = 'Currently not available'
 
-    $sqlQueryGetCurrentAccountResult = [System.Collections.ArrayList]::new()
-    $sqlQueryGetCurrentAccountSplatParams = @{
-        ConnectionString = $connectionString
-        SqlQuery         = $sqlQueryGetCurrentAccount
-        ErrorAction      = 'Stop'
+    # Validate correlation configuration
+    if ($actionContext.CorrelationConfiguration.Enabled) {
+        $correlationField = $actionContext.CorrelationConfiguration.accountField
+        $correlationValue = $actionContext.CorrelationConfiguration.accountFieldValue
+
+        if ([string]::IsNullOrEmpty($($correlationField))) {
+            throw 'Correlation is enabled but not configured correctly'
+        }
+        if ([string]::IsNullOrEmpty($($correlationValue))) {
+            throw 'Correlation is enabled but [accountFieldValue] is empty. Please make sure it is correctly mapped'
+        }
+
+        # Verify if a user must be either [created ] or just [correlated]
+        Write-Information "Querying record from SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'"
+        $sqlQueryGetCurrentAccount = "
+        SELECT 
+            * 
+        FROM 
+            $($actionContext.Configuration.table) 
+        WHERE 
+            $correlationField = '$correlationValue'"
+
+        $sqlQueryGetCurrentAccountResult = [System.Collections.ArrayList]::new()
+        $sqlQueryGetCurrentAccountSplatParams = @{
+            ConnectionString = $actionContext.Configuration.connectionString
+            SqlQuery         = $sqlQueryGetCurrentAccount
+            ErrorAction      = 'Stop'
+        }
+
+        Invoke-SQLQuery @sqlQueryGetCurrentAccountSplatParams -Data ([ref]$sqlQueryGetCurrentAccountResult)
+        $correlatedAccount = $sqlQueryGetCurrentAccountResult
     }
-
-    Invoke-SQLQuery @sqlQueryGetCurrentAccountSplatParams -Data ([ref]$sqlQueryGetCurrentAccountResult)
-    $currentAccount = $sqlQueryGetCurrentAccountResult
-    Write-Verbose "Successfully queried record from SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Result count: $($currentAccount.$correlationProperty.Count)"
-
-    if (-not[String]::IsNullOrEmpty($currentAccount.$correlationProperty)) {
-        Write-Verbose "Existing record found in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-        
-        if ($updateOnCorrelate -eq $true) {
-            $action = 'Update-Correlate'
-
-            #Verify if the account must be updated
-            $splatCompareProperties = @{
-                ReferenceObject  = @( ($currentAccount | Select-Object *).PSObject.Properties )
-                DifferenceObject = @( ($account | Select-Object *).PSObject.Properties )
-            }
-            $propertiesChanged = (Compare-Object @splatCompareProperties -PassThru).Where( { $_.SideIndicator -eq '=>' })
-
-            if ($propertiesChanged) {
-                Write-Verbose "Account property(s) required to update: [$($propertiesChanged -join ",")]"
-                $updateAction = 'Update'
-            }
-            else {
-                $updateAction = 'NoChanges'
-            }
-        }
-        else {
-            $action = 'Correlate'
-        }
-    } 
     else {
-        Write-Verbose "No record found in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Creating new acount"
-        $action = 'Create'
+        $outputContext.AuditLogs.Add([PSCustomObject]@{
+                Action  = "CorrelateAccount"
+                Message = "Configuration of correlation is madatory."
+                IsError = $true
+            })
+        Throw "Configuration of correlation is mandatory."
     }
-}
-catch {
-    $ex = $PSItem
-    $verboseErrorMessage = $ex.Exception.Message
-    $auditErrorMessage = $ex.Exception.Message
 
-    Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
+    if ($null -ne $correlatedAccount) {        
+        $action = 'CorrelateAccount'
+    }
+    else {
+        $action = 'CreateAccount'
+    }
 
-    $success = $false  
-    $auditLogs.Add([PSCustomObject]@{
-            Action  = "CreateAccount"
-            Message = "Error querying record from SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Sql Query: [$sqlQueryGetCurrentAccount]. Error Message: $auditErrorMessage"
-            IsError = $True
-        })
-}
-
-try {
-    # either create, update and correlate or just correlate SQL record
-    switch ($action) {
-        'Create' {
-            try {
-                Write-Verbose "Creating record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
+    # Add a message and the result of each of the validations showing what will happen during enforcement
+    if ($actionContext.DryRun -eq $true) {
+        Write-Information "[DryRun] $action SQL account for: [$($personContext.Person.DisplayName)], will be executed during enforcement"
+    }
+    
+    # Process
+    if (-not($actionContext.DryRun -eq $true)) {
+        switch ($action) {
+            'CreateAccount' {
                 
+                Write-Information "Creating record in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'"
+
                 # Create list of property names and values
                 [System.Collections.ArrayList]$sqlQueryCreateProperties = @()
                 [System.Collections.ArrayList]$sqlQueryCreateValues = @()
-                foreach ($property in $account.PSObject.Properties) {
+                foreach ($property in $actionContext.Data.PSObject.Properties) {
                     # Enclose Name with brackets []
                     $null = $sqlQueryCreateProperties.Add("[$($property.Name)]")
                     # Enclose Value with single quotes ''
@@ -215,172 +149,59 @@ try {
                 }
 
                 $sqlQueryCreateNewAccount = "
-                INSERT INTO $table
-                    ($($sqlQueryCreateProperties -join ','))
-                VALUES
-                    ($($sqlQueryCreateValues -join ','))"
-        
+                    INSERT INTO $($actionContext.Configuration.table) 
+                        ($($sqlQueryCreateProperties -join ',')) 
+                    VALUES 
+                        ($($sqlQueryCreateValues -join ','))"
+            
                 $sqlQueryCreateNewAccountResult = [System.Collections.ArrayList]::new()
                 $sqlQueryCreateNewAccountSplatParams = @{
-                    ConnectionString = $connectionString
+                    ConnectionString = $actionContext.Configuration.connectionString
                     SqlQuery         = $sqlQueryCreateNewAccount
                     ErrorAction      = 'Stop'
                 }
 
-                if (-not($dryRun -eq $true)) {
-                    Invoke-SQLQuery @sqlQueryCreateNewAccountSplatParams -Data ([ref]$sqlQueryCreateNewAccountResult)
-                    $createdAccount = $sqlQueryCreateNewAccountResult
+                Invoke-SQLQuery @sqlQueryCreateNewAccountSplatParams -Data ([ref]$sqlQueryCreateNewAccountResult)
+                $createdAccount = $sqlQueryCreateNewAccountResult
 
-                    $aRef = [PSCustomObject]@{
-                        $correlationProperty = $createdAccount.$correlationProperty
-                    }
+                $outputContext.Data = $actionContext.Data
+                $outputContext.AccountReference = $correlationValue
 
-                    $auditLogs.Add([PSCustomObject]@{
-                            Action  = "CreateAccount"
-                            Message = "Successfully created record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Account object: $($account | Out-String)"
-                            IsError = $false
-                        })
-                }
-                else {
-                    Write-Warning "DryRun: Would create record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Account object: $($account | Out-String)"
-                }
-                break
-            }
-            catch {
-                $ex = $PSItem
-                $verboseErrorMessage = $ex.Exception.Message
-                $auditErrorMessage = $ex.Exception.Message
-        
-                Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
-        
-                $success = $false  
-                $auditLogs.Add([PSCustomObject]@{
-                        Action  = "CreateAccount"
-                        Message = "Error creating record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Sql Query: [$sqlQueryCreateNewAccount]. Error Message: $auditErrorMessage"
-                        IsError = $True
-                    })
-            }
-        }
-        'Update-Correlate' {
-            Write-Verbose "Updating and correlating record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-
-            switch ($updateAction) {
-                'Update' {
-                    try {
-                        Write-Verbose "Updating record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-
-                        # Create list of porperties to update
-                        [System.Collections.ArrayList]$sqlQueryUpdateProperties = @()
-                        foreach ($property in $propertiesChanged) {
-                            # Enclose Name with brackets [] and Value with single quotes ''
-                            $null = $sqlQueryUpdateProperties.Add("[$($property.Name)] = '$($property.Value)'")
-                        }
-
-                        $sqlQueryUpdateCurrentAccount = "
-                        UPDATE
-                            $table
-                        SET
-                            $($sqlQueryUpdateProperties -join ',')
-                        WHERE
-                            $correlationProperty = '$correlationValue'"
-                
-                        $sqlQueryUpdateCurrentAccountResult = [System.Collections.ArrayList]::new()
-                        $sqlQueryUpdateCurrentAccountSplatParams = @{
-                            ConnectionString = $connectionString
-                            SqlQuery         = $sqlQueryUpdateCurrentAccount
-                            ErrorAction      = 'Stop'
-                        }
-                
-                        if (-not($dryRun -eq $true)) {
-                            Invoke-SQLQuery @sqlQueryUpdateCurrentAccountSplatParams -Data ([ref]$sqlQueryUpdateCurrentAccountResult)
-                            $updatedAccount = $sqlQueryUpdateCurrentAccountResult
-
-                            $aRef = [PSCustomObject]@{
-                                $correlationProperty = $updatedAccount.$correlationProperty
-                            }
-
-                            $auditLogs.Add([PSCustomObject]@{
-                                    Action  = "CreateAccount"
-                                    Message = "Successfully updated record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Properties updated: [$($sqlQueryUpdateProperties -join ',')]"
-                                    IsError = $false
-                                })
-                        }
-                        else {
-                            Write-Warning "DryRun: Would update record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Properties to update: [$($sqlQueryUpdateProperties -join ',')]"
-                        }
-                        break
-                    }
-                    catch {
-                        $ex = $PSItem
-                        $verboseErrorMessage = $ex.Exception.Message
-                        $auditErrorMessage = $ex.Exception.Message
-                
-                        Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
-                
-                        $success = $false  
-                        $auditLogs.Add([PSCustomObject]@{
-                                Action  = "CreateAccount"
-                                Message = "Error updating record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'. Sql Query: [$sqlQueryUpdateCurrentAccount]. Error Message: $auditErrorMessage"
-                                IsError = $True
-                            })
-                    }
-                }
-                'NoChanges' {
-                    Write-Verbose "No changes to record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-
-                    if (-not($dryRun -eq $true)) {
-                        $aRef = [PSCustomObject]@{
-                            $correlationProperty = $currentAccount.$correlationProperty
-                        }
-
-                        $auditLogs.Add([PSCustomObject]@{
-                                Action  = "CreateAccount"
-                                Message = "Successfully updated record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)' (No Changes needed)"
-                                IsError = $false
-                            })
-                    }
-                    else {
-                        Write-Warning "DryRun: No changes to record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-                    }
-                    break
-                }
-            }
-            break
-        }
-        'Correlate' {
-            Write-Verbose "Correlating record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
-
-            if (-not($dryRun -eq $true)) {
-                $aRef = [PSCustomObject]@{
-                    $correlationProperty = $currentAccount.$correlationProperty
-                }
-
-                $auditLogs.Add([PSCustomObject]@{
-                        Action  = "CreateAccount"
-                        Message = "Successfully correlated record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
+                $outputContext.AuditLogs.Add([PSCustomObject]@{
+                        Action  = $action
+                        Message = "Successfully created record in SQL table '$($actionContext.Configuration.table)' where '$($correlationProperty)'='$($correlationValue)'."
                         IsError = $false
                     })
+                
+                break                    
             }
-            else {
-                Write-Warning "DryRun: Would correlate record in SQL table '$($table)' where '$($correlationProperty)'='$($correlationValue)'"
+
+            'CorrelateAccount' {
+                Write-Information 'Correlating SQL account'
+
+                $outputContext.Data = $actionContext.Data
+                $outputContext.AccountReference = $correlationValue
+                $outputContext.AccountCorrelated = $true
+                $outputContext.AuditLogs.Add([PSCustomObject]@{
+                        Action  = $action
+                        Message = "Correlated account: [$($correlatedAccount.DisplayName)] on field: [$($correlationField)] with value: [$($correlationValue)]"
+                        IsError = $false
+                    })
+                break
             }
-            break
-        }
+        }      
+        $outputContext.Success = $true  
     }
 }
-finally {
-    # Send results
-    $result = [PSCustomObject]@{
-        Success          = $success
-        AccountReference = $aRef
-        Auditlogs        = $auditLogs
-        Account          = $account
- 
-        # Optionally return data for use in other systems
-        ExportData       = [PSCustomObject]@{
-            $correlationProperty = $account.$correlationProperty
-        } 
-    }
-
-    Write-Output $result | ConvertTo-Json -Depth 10
+catch {        
+    $ex = $PSItem
+    
+    $auditMessage = "Could not create or correlate SQL account. Error: $($ex.Exception.Message)"
+    Write-Warning "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
+    
+    $outputContext.AuditLogs.Add([PSCustomObject]@{
+            Action  = "CreateAccount"
+            Message = $auditMessage            
+            IsError = $true
+        })
 }

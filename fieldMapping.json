@@ -1,0 +1,212 @@
+{
+  "Version": "v1",
+  "MappingFields": [
+    {
+      "Name": "NickName",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.Name.NickName\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "Manager",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.PrimaryContract.Manager.ExternalId\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "EmployeeId",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Enable", "Update", "Delete", "Disable"],
+          "MappingMode": "Field",
+          "Value": "\"Person.ExternalId\"",
+          "UsedInNotifications": true,
+          "StoreInAccountData": true
+        }
+      ]
+    },
+    {
+      "Name": "Initials",
+      "Description": "",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.Name.Initials\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "LastName",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.Name.FamilyName\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "DisplayName",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Complex",
+          "Value": "\"\\r\\n\\r\\n// Please enter the mapping logic to generate the displayName based on name convention.\\r\\nfunction generateDisplayName() {\\r\\n\\tlet nameFormatted = ''\\r\\n    let firstName = Person.Name.NickName;\\r\\nlet middleName = Person.Name.FamilyNamePrefix;\\r\\nlet lastName = Person.Name.FamilyName;\\r\\nlet middleNamePartner = Person.Name.FamilyNamePartnerPrefix;\\r\\nlet lastNamePartner = Person.Name.FamilyNamePartner;\\r\\n\\r\\n\\tswitch(Person.Name.Convention) {\\r\\n\\t\\tcase \\\"B\\\":\\r\\n        nameFormatted = firstName\\r\\n        if (typeof middleName !== 'undefined' && middleName) { nameFormatted = nameFormatted + ' ' + middleName }\\r\\n        nameFormatted = nameFormatted + ' ' + lastName;\\r\\n        break;\\r\\n    case \\\"P\\\":\\r\\n        nameFormatted = firstName\\r\\n        if (typeof middleNamePartner !== 'undefined' && middleNamePartner) { nameFormatted = nameFormatted + ' ' + middleNamePartner }\\r\\n        nameFormatted = nameFormatted + ' ' + lastNamePartner;\\r\\n        break;\\r\\n    case \\\"BP\\\":\\r\\n        nameFormatted = firstName\\r\\n        if (typeof middleName !== 'undefined' && middleName) { nameFormatted = nameFormatted + ' ' + middleName }\\r\\n        nameFormatted = nameFormatted + ' ' + lastName + '-';\\r\\n        if (typeof middleNamePartner !== 'undefined' && middleNamePartner) { nameFormatted = nameFormatted + ' ' + middleNamePartner + ' ' }\\r\\n        nameFormatted = nameFormatted + lastNamePartner;\\r\\n        break;\\r\\n    case \\\"PB\\\":\\r\\n        nameFormatted = firstName\\r\\n        if (typeof middleNamePartner !== 'undefined' && middleNamePartner) { nameFormatted = nameFormatted + ' ' + middleNamePartner }\\r\\n        nameFormatted = nameFormatted + ' ' + lastNamePartner + '-';\\r\\n        if (typeof middleName !== 'undefined' && middleName) { nameFormatted = nameFormatted + ' ' + middleName + ' ' }\\r\\n        nameFormatted = nameFormatted + lastName;\\r\\n        break;\\r\\n    default:\\r\\n        nameFormatted = firstName\\r\\n        if (typeof middleName !== 'undefined' && middleName) { nameFormatted = nameFormatted + ' ' + middleName }\\r\\n        nameFormatted = nameFormatted + ' ' + lastName;\\r\\n        break;\\r\\n\\t}\\r\\n\\tconst displayName = nameFormatted;\\r\\n\\treturn displayName;\\r\\n}\\r\\n\\r\\ngenerateDisplayName();\\r\\n\\r\\n\"",
+          "UsedInNotifications": true,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "DepartmentCode",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.PrimaryContract.Department.ExternalId\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "Department",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.PrimaryContract.Department.DisplayName\"",
+          "UsedInNotifications": true,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "JobTitleCode",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.PrimaryContract.Title.ExternalId\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "JobTitle",
+      "Description": "",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.PrimaryContract.Title.Name\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": true
+        }
+      ]
+    },
+    {
+      "Name": "NamePrefix",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Complex",
+          "Value": "\"function getPrefixes() {\\n    let middleName = Person.Name.FamilyNamePrefix;\\n    let middleNamePartner = Person.Name.FamilyNamePartnerPrefix;\\n    let convention = Person.Name.Convention;\\n\\n    let nameFormatted = '';\\n    let prefix = '';\\n\\n    switch (convention) {\\n        case \\\"P\\\":\\n        case \\\"PB\\\":\\n            nameFormatted = middleNamePartner;\\n            break;\\n        case \\\"B\\\":\\n        case \\\"BP\\\":\\n        default:\\n            nameFormatted = middleName;\\n            break;\\n    }\\n\\n    if (typeof nameFormatted !== 'undefined' && nameFormatted) {\\n        prefix = nameFormatted.trim();\\n    } else {\\n        prefix = nameFormatted;\\n    }\\n\\n    return prefix;\\n}\\n\\ngetPrefixes();\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "Active",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Enable"],
+          "MappingMode": "Fixed",
+          "Value": "\"1\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        },
+        {
+          "MapForActions": ["Disable", "Create"],
+          "MappingMode": "Fixed",
+          "Value": "\"0\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "BusinessMail",
+      "Description": "",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Complex",
+          "Value": "\"function getMailAddress() {\\r\\n    let mail = '';\\r\\n\\r\\n    if (typeof Person.Accounts.MicrosoftActiveDirectory.mail !== 'undefined' && Person.Accounts.MicrosoftActiveDirectory.mail) {\\r\\n        mail = Person.Accounts.MicrosoftActiveDirectory.mail;\\r\\n    }\\r\\n\\r\\n    return mail;\\r\\n}\\r\\n\\r\\ngetMailAddress()\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "BusinessMobile",
+      "Description": "",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.Contact.Business.Phone.Mobile\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    },
+    {
+      "Name": "BusinessPhone",
+      "Type": "Text",
+      "MappingActions": [
+        {
+          "MapForActions": ["Create", "Update"],
+          "MappingMode": "Field",
+          "Value": "\"Person.Contact.Business.Phone.Fixed\"",
+          "UsedInNotifications": false,
+          "StoreInAccountData": false
+        }
+      ]
+    }
+  ],
+  "UniqueFieldNames": []
+}

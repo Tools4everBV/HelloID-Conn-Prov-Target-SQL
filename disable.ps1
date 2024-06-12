@@ -1,7 +1,7 @@
-##################################################
-# HelloID-Conn-Prov-Target-SQL-Delete
+#################################################
+# HelloID-Conn-Prov-Target-SQL-Disable
 # PowerShell V2
-##################################################
+#################################################
 
 # Enable TLS1.2
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
@@ -80,10 +80,10 @@ try {
         throw 'The account reference could not be found'
     }
 
-    Write-Information "Verifying if a SQL account for [$($personContext.Person.DisplayName)] exists"
     $correlationField = $actionContext.CorrelationConfiguration.accountField
     $correlationValue = $actionContext.References.Account
-    
+
+    Write-Information "Verifying if a SQL account for [$($personContext.Person.DisplayName)] exists"    
     $sqlQueryGetCurrentAccount = "
         SELECT 
             * 
@@ -101,11 +101,12 @@ try {
 
     Invoke-SQLQuery @sqlQueryGetCurrentAccountSplatParams -Data ([ref]$sqlQueryGetCurrentAccountResult)
     $correlatedAccount = $sqlQueryGetCurrentAccountResult
-    
+        
+    $outputContext.PreviousData.Active = [string][int]$correlatedAccount.Active
 
     if ($null -ne $correlatedAccount) {
-        $action = 'DeleteAccount'
-        $dryRunMessage = "Delete SQL account: [$($actionContext.References.Account)] for person: [$($personContext.Person.DisplayName)] will be executed during enforcement"
+        $action = 'DisableAccount'
+        $dryRunMessage = "Disable SQL account: [$($actionContext.References.Account)] for person: [$($personContext.Person.DisplayName)] will be executed during enforcement"
     }
     else {
         $action = 'NotFound'
@@ -117,59 +118,61 @@ try {
         Write-Information "[DryRun] $dryRunMessage"
     }
 
-
     # Process
     if (-not($actionContext.DryRun -eq $true)) {
         switch ($action) {
-            'DeleteAccount' {
-                
-                Write-Information "Deleting SQL account with accountReference: [$($actionContext.References.Account)]"
-                $sqlQueryDeleteCurrentAccount = "
-                DELETE
-                FROM
+            'DisableAccount' {                
+                Write-Information "Disabling SQL account with accountReference: [$($actionContext.References.Account)]"
+
+                $sqlQueryDisableAccount = "
+                UPDATE
                     $($actionContext.Configuration.table)
+                SET
+                    Active = $($actionContext.Data.Active)
                 WHERE
-                    $correlationField = '$correlationValue'"
-        
-                $sqlQueryDeleteCurrentAccountResult = [System.Collections.ArrayList]::new()
-                $sqlQueryDeleteCurrentAccountSplatParams = @{
+                    $correlationField = '$correlationValue'"                    
+
+                $sqlQueryDisableAccountResult = [System.Collections.ArrayList]::new()
+                $sqlQuerDisableAccountSplatParams = @{
                     ConnectionString = $actionContext.Configuration.connectionString
-                    SqlQuery         = $sqlQueryDeleteCurrentAccount
+                    SqlQuery         = $sqlQueryDisableAccount
                     ErrorAction      = 'Stop'
                 }
 
-                Invoke-SQLQuery @sqlQueryDeleteCurrentAccountSplatParams -Data ([ref]$sqlQueryDeleteCurrentAccountResult)
-                $deletedAccount = $sqlQueryDeleteCurrentAccountResult
-        
+                Invoke-SQLQuery @sqlQuerDisableAccountSplatParams -Data ([ref]$sqlQueryDisableAccountResult)
+                $null = $sqlQueryDisableAccountResult
+
+                $outputContext.Data = $actionContext.Data
+                $outputContext.AccountReference = $correlationValue
+
                 $outputContext.AuditLogs.Add([PSCustomObject]@{
                         Action  = $action
-                        Message = "Successfully deleted record in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'"
+                        Message = "Successfully disabled account in SQL table '$($actionContext.Configuration.table)' where '$($correlationField)'='$($correlationValue)'."
                         IsError = $false
                     })
                 
                 break
             }
-
             'NotFound' {                
                 $outputContext.AuditLogs.Add([PSCustomObject]@{
-                        Action  = 'DeleteAccount'
+                        Action  = 'DisableAccount'
                         Message = "SQL account: [$($actionContext.References.Account)] for person: [$($personContext.Person.DisplayName)] could not be found, possibly indicating that it could be deleted, or the account is not correlated"
                         IsError = $false
-                    })
+                    })                
                 break
             }
         }
         $outputContext.Success = $true
     }
 }
-catch {    
+catch {        
     $ex = $PSItem
-    
-    $auditMessage = "Could not delete SQL account. Error: $($_.Exception.Message)"
+   
+    $auditMessage = "Could not disable SQL account. Error: $($ex.Exception.Message)"
     Write-Warning "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($ex.Exception.Message)"
-    
+   
     $outputContext.AuditLogs.Add([PSCustomObject]@{
-            Action  = 'DeleteAccount'
+            Action  = "DisableAccount"
             Message = $auditMessage
             IsError = $true
         })

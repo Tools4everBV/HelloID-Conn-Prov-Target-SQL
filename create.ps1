@@ -113,7 +113,7 @@ try {
     else {
         $outputContext.AuditLogs.Add([PSCustomObject]@{
                 Action  = "CorrelateAccount"
-                Message = "Configuration of correlation is madatory."
+                Message = "Configuration of correlation is mandatory."
                 IsError = $true
             })
         Throw "Configuration of correlation is mandatory."
